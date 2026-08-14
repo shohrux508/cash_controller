@@ -54,20 +54,14 @@ async def client(
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create an httpx AsyncClient wired to the test application."""
     app = create_app()
-    # Manually initialize the container with test resources
-    # instead of relying on lifespan (which uses real DB)
-    import httpx as httpx_lib
 
     from app.core.container import AppContainer
 
     container = AppContainer()
     container.engine = engine
     container.session_factory = session_factory
-    container.http_client = httpx_lib.AsyncClient(timeout=5.0)
     app.state.container = container
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-
-    await container.http_client.aclose()

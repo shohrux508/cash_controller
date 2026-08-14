@@ -29,6 +29,9 @@ WORKDIR /app
 COPY --from=builder /app /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Create data directory for SQLite volume
+RUN mkdir -p /app/data && chown appuser:appuser /app/data
+
 # Switch to non-root user
 USER appuser
 

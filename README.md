@@ -1,120 +1,151 @@
-# backend-template
+# CashController 💰
 
-Промышленный шаблон для быстрого развертывания серверной экосистемы на FastAPI.
+Telegram-бот для быстрого учёта личных и семейных финансов.
 
-Минималистичный, строго типизированный каркас — только чистый REST API, готовый к масштабированию.
+**Быстрый ввод** — просто напиши в чат:
+```
+-25 такси       →  расход 25 000 сум
++150 зарплата   →  доход 150 000 сум
+-3.5 кофе       →  расход 3 500 сум
+```
+
+Число автоматически умножается на 1 000. Категория определяется по описанию.
 
 ---
 
+## Возможности
+
+- 🚀 **Быстрый ввод** — `+25 зарплата`, `-15 такси`
+- 📊 **Статистика** — за день, неделю, месяц с разбивкой по категориям
+- 📋 **История** — последние записи, отмена последней
+- 📁 **Категории** — автоматическое определение + свои
+- ⏰ **Напоминания** — настраиваемые по расписанию
+- 👨‍👩‍👧‍👦 **Семейный доступ** — whitelist по Telegram ID
+- 🌐 **REST API** — готов для WebApp
+
 ## Быстрый старт
 
-### Локально (uv)
+### 1. Установка
 
 ```bash
-# Установить зависимости (включая dev)
+# Клонировать и установить зависимости
+git clone <repo-url> cash_controller
+cd cash_controller
 uv sync --all-extras
 
-# Скопировать переменные окружения
+# Настроить переменные окружения
 cp .env.example .env
-
-# Запустить сервер
-uv run python main.py
-
-# Открыть документацию: http://localhost:8000/docs
+# Отредактировать .env — указать BOT_TOKEN и ADMIN_CHAT_IDS
 ```
 
-### Docker
+### 2. Получить BOT_TOKEN
+
+1. Открой [@BotFather](https://t.me/BotFather) в Telegram
+2. Отправь `/newbot`, выбери имя
+3. Скопируй токен в `.env`
+
+### 3. Узнать свой Telegram ID
+
+1. Открой [@userinfobot](https://t.me/userinfobot) в Telegram
+2. Скопируй ID в `ADMIN_CHAT_IDS` в `.env`
+
+### 4. Запуск
 
 ```bash
-# Скопировать переменные окружения
-cp .env.example .env
-
-# Собрать и запустить (app + PostgreSQL)
-docker-compose up --build
+uv run python main.py
 ```
+
+Бот и API запустятся одновременно:
+- Telegram бот — polling
+- REST API — http://localhost:8000/docs
+
+---
+
+## Команды бота
+
+| Команда | Описание |
+|---------|----------|
+| `/start` | Приветствие и инструкция |
+| `/help` | Полная справка |
+| `/today` | Итоги за сегодня |
+| `/week` | Итоги за неделю |
+| `/month` | Итоги за месяц |
+| `/history` | Последние 10 записей |
+| `/undo` | Удалить последнюю запись |
+| `/categories` | Список категорий |
+| `/reminder 21:00` | Установить напоминание |
+| `/reminder off` | Отключить напоминание |
+| `/reminder` | Проверить статус |
+
+---
+
+## Конфигурация (.env)
+
+| Переменная | Описание | По умолчанию |
+|------------|----------|-------------|
+| `APP_NAME` | Название | `cash-controller` |
+| `DEBUG` | Режим отладки | `false` |
+| `DATABASE_URL` | URL базы данных | `sqlite+aiosqlite:///./dev.db` |
+| `BOT_TOKEN` | Токен бота (обязательно) | — |
+| `ADMIN_CHAT_IDS` | Telegram ID пользователей | `[]` |
+| `LOG_LEVEL` | Уровень логов | `INFO` |
 
 ---
 
 ## Структура проекта
 
 ```
-backend-template/
+cash_controller/
 ├── app/
-│   ├── api/                # Эндпоинты, роутеры, зависимости FastAPI
-│   │   ├── deps.py         # Depends: get_session
-│   │   └── v1/
-│   │       └── health.py   # GET /api/v1/health/
-│   ├── core/               # Конфигурация и оркестратор приложения
-│   │   ├── config.py       # Settings (pydantic-settings)
-│   │   └── container.py    # AppContainer + lifespan + create_app()
-│   ├── database/           # Подключение к БД и ORM-модели
-│   │   ├── engine.py       # AsyncEngine, async_sessionmaker
-│   │   └── models.py       # Base, TimestampMixin
-│   ├── services/           # Слой бизнес-логики (заготовка)
-│   └── logger.py           # Loguru + перехват stdlib логов
-├── migrations/             # Alembic (async, render_as_batch=True)
-├── scripts/
-│   └── run_checks.py       # Единый конвейер качества
-├── tests/                  # pytest-asyncio + in-memory SQLite
-├── main.py                 # Точка входа (Windows event loop fix)
-├── pyproject.toml          # Зависимости, ruff, mypy, pytest
-├── Dockerfile              # Multi-stage (python:3.12-slim + uv)
-└── docker-compose.yml      # app + PostgreSQL 16
+│   ├── api/v1/              # REST API эндпоинты
+│   │   ├── health.py        # GET /api/v1/health/
+│   │   └── transactions.py  # CRUD транзакций
+│   ├── bot/                 # Telegram бот (Aiogram 3)
+│   │   ├── handlers/        # Обработчики команд
+│   │   ├── middlewares/      # Auth middleware
+│   │   ├── keyboards/       # Inline клавиатуры
+│   │   ├── scheduler.py     # APScheduler (напоминания)
+│   │   └── utils.py         # Форматирование
+│   ├── core/                # Конфигурация
+│   │   ├── config.py        # Settings
+│   │   └── container.py     # Lifespan, Bot + FastAPI
+│   ├── database/            # SQLAlchemy ORM
+│   │   ├── engine.py        # Async engine
+│   │   └── models.py        # User, Category, Transaction, Reminder
+│   └── services/            # Бизнес-логика
+│       ├── user_service.py
+│       ├── category_service.py
+│       ├── transaction_service.py
+│       └── reminder_service.py
+├── tests/
+├── Dockerfile
+├── docker-compose.yml
+└── pyproject.toml
 ```
 
 ---
 
-## Конфигурация (.env)
-
-| Переменная      | Описание                      | По умолчанию                      |
-|-----------------|-------------------------------|-----------------------------------|
-| `APP_NAME`      | Название приложения           | `backend-template`                |
-| `DEBUG`         | Режим отладки                 | `false`                           |
-| `DATABASE_URL`  | URL базы данных               | `sqlite+aiosqlite:///./dev.db`    |
-| `LOG_LEVEL`     | Уровень логирования           | `INFO`                            |
-| `LOG_FORMAT`    | Формат логов (`text` / `json`)| `text`                            |
-| `CORS_ORIGINS`  | Разрешённые origins           | `*`                               |
-
----
-
-## Миграции (Alembic)
+## Деплой (Docker / Railway)
 
 ```bash
-# Создать миграцию
-uv run alembic revision --autogenerate -m "описание"
+# Docker
+docker-compose up --build
 
-# Применить миграции
-uv run alembic upgrade head
-
-# Откатить на одну
-uv run alembic downgrade -1
+# Railway
+# 1. Подключить репозиторий
+# 2. Добавить переменные: BOT_TOKEN, ADMIN_CHAT_IDS, DATABASE_URL
+# 3. Добавить volume для /app/data (SQLite persistence)
 ```
-
----
-
-## Проверка качества
-
-```bash
-# Запустить все проверки одной командой
-uv run python scripts/run_checks.py
-```
-
-Конвейер выполняет:
-1. **ruff check** — линтинг
-2. **ruff format** — форматирование
-3. **mypy --strict** — статическая типизация
-4. **pytest --cov** — тесты с покрытием
 
 ---
 
 ## Стек технологий
 
-| Категория     | Инструменты                                        |
-|---------------|----------------------------------------------------|
-| Web           | FastAPI, Uvicorn, httpx                            |
-| Данные        | SQLAlchemy ≥ 2.0 (async), aiosqlite, asyncpg, Alembic |
-| Конфигурация  | pydantic-settings, python-dotenv                   |
-| Логи          | Loguru (JSON + text, перехват stdlib)               |
-| Качество      | ruff, mypy (strict), pytest, pytest-cov            |
-| Инфраструктура| Docker (multi-stage), docker-compose               |
-| Пакеты        | uv                                                 |
+| Категория | Инструменты |
+|-----------|------------|
+| Bot | Aiogram 3, APScheduler |
+| Web | FastAPI, Uvicorn |
+| Данные | SQLAlchemy 2.0 (async), aiosqlite |
+| Конфигурация | pydantic-settings |
+| Логи | Loguru |
+| Инфраструктура | Docker, uv |
